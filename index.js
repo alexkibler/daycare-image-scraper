@@ -28,6 +28,7 @@ const NUMBER_OF_DAYS_TO_SCRAPE = 2;
     }
 
     async function scrapeBabies() {
+        console.log(`Starting to scrape.  Current time is ${new Date().toISOString()}`)
         const browser = await puppeteer.launch();
         const page = await browser.newPage();
         if (await login(page)) {
@@ -58,10 +59,10 @@ const NUMBER_OF_DAYS_TO_SCRAPE = 2;
                             await fs.mkdirSync(`./images/${innerText.events[i].event_date.substr(0,7)}`, { recursive: true});
                             const imageBuffer = await response.buffer()
                             await fs.promises.writeFile(path, imageBuffer)
-                            await utimes(path, +(innerText.events[i].event_time.toString()+'000'))
                         } else {
                             console.log('Image already exists: ' + innerText.events[i].event_date);
                         }
+                        await utimes(path, +(innerText.events[i].event_time.toString()+'000'))
                     }
 
                 }
