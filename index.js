@@ -1,9 +1,10 @@
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const https = require('https');
+const {utimes} = require('utimes');
 const MINUTE = 60000;
 const HOUR = MINUTE * 60;
-
+const NUMBER_OF_DAYS_TO_SCRAPE = 1;
 
 (async () => {
 
@@ -29,7 +30,10 @@ const HOUR = MINUTE * 60;
         const browser = await puppeteer.launch();
         const page = await browser.newPage();
         if (await login(page)) {
-            await page.goto('https://www.tadpoles.com/remote/v1/events?direction=range&earliest_event_time=1&latest_event_time=164369160000&num_events=300&client=dashboard&type=Activity');
+            let startDate = new Date();
+            startDate.setDate(startDate.getDate() - NUMBER_OF_DAYS_TO_SCRAPE);
+            startDate = Math.floor(startDate.getTime() / 1000)
+            await page.goto(`https://www.tadpoles.com/remote/v1/events?direction=range&earliest_event_time=${startDate}&latest_event_time=${Math.ceil(Date.now() / 1000)}&num_events=300&client=dashboard&type=Activity`);
             var apiResponse = await page.content();
 
             const innerText = await page.evaluate(() =>  {
@@ -39,36 +43,37 @@ const HOUR = MINUTE * 60;
                 const obj = innerText.events[i].key;
                 const key = innerText.events[i].attachments[0];
                 var url = `https://www.tadpoles.com/remote/v1/obj_attachment?obj=${obj}&key=${key};`
-                const response = await page.goto(url, {timeout: 0, waitUntil: 'networkidle0'});
-                if (!fs.existsSync(`./images/${innerText.events[i].event_date}/${innerText.events[i].attachments[0]}.png`)) {
-                    console.log('Saving image from ' + innerText.events[i].event_date);
-                    await fs.mkdirSync(`./images/${innerText.events[i].event_date}`, { recursive: true});
-                    const imageBuffer = await response.buffer()
-                    await fs.promises.writeFile(`./images/${innerText.events[i].event_date}/${innerText.events[i].attachments[0]}.png`, imageBuffer)
-                } else {
-                    console.log('Image already exists: ' + innerText.events[i].event_date);
+                try
+                {
+                    const response = await page.goto(url, {timeout: 0, waitUntil: 'networkidle0'});
+                    if (innerText.events[i].new_attachments[0]?.mime_type == 'video/mp4'){
+
+                        // TODO: figure out why videos don't work
+
+                    } else {
+                        const path = `./images/${innerText.events[i].event_date}/${innerText.events[i].event_time}.png`
+                        if (!fs.existsSync(path)) {
+                            console.log('Saving image from ' + innerText.events[i].event_date);
+                            await fs.mkdirSync(`./images/${innerText.events[i].event_date}`, { recursive: true});
+                            const imageBuffer = await response.buffer()
+                            await fs.promises.writeFile(path, imageBuffer)
+                            await utimes(path, +(innerText.events[i].event_time.toString()+'000'))
+                        } else {
+                            console.log('Image already exists: ' + innerText.events[i].event_date);
+                        }
+                    }
+
                 }
-                await new Promise(r => setTimeout(r, 100));
+                catch (error)
+                {
+                    console.error(error);
+                }
             }
-            // const links = await page.$$eval('a.fancybox', e=>e.map(a=>{return {id:a.id, href:a.href}}));
-            // console.log(`Got ${links.length} images. Downloading now`);
-            // for(var i = 0;i < links.length; i++) {
-            // if (fs.existsSync(`./images/${links[i].id}.png`)) {
-            //     console.log(`Image ${i} already exists. Skipping.`);
-            // } else {
-            //     console.log('Downloading image: ' + i);
-            //     const pageNew = await browser.newPage()
-            //     const response = await pageNew.goto(links[i].href, {timeout: 0, waitUntil: 'networkidle0'})
-            //     const imageBuffer = await response.buffer()
-            //     await fs.promises.writeFile(`./images/${links[i].id}.png`, imageBuffer)
-            //     pageNew.close();
-            // }
-            // }
-            // console.log('All done!');     
-            // await browser.close();
+            console.log('All done!');     
         } else {
             console.log('Login failed');
         }
+        await browser.close();
 
     }
 

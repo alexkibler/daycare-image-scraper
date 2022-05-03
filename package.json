@@ -3,12 +3,13 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start":"node index.js"
+    "start": "node index.js"
   },
   "repository": "https://github.com/alexkibler/tadpoles-scraper",
   "author": "Alex Kibler",
   "license": "MIT",
   "dependencies": {
-    "puppeteer": "^13.7.0"
+    "puppeteer": "^13.7.0",
+    "utimes": "^5.1.1"
   }
 }
