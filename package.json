@@ -9,6 +9,7 @@
   "author": "Alex Kibler",
   "license": "MIT",
   "dependencies": {
+    "dotenv": "^16.0.0",
     "puppeteer": "^13.7.0",
     "utimes": "^5.1.1"
   }

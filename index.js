@@ -1,10 +1,11 @@
+require('dotenv').config();
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const https = require('https');
 const {utimes} = require('utimes');
 const MINUTE = 60000;
 const HOUR = MINUTE * 60;
-const NUMBER_OF_DAYS_TO_SCRAPE = 1000;
+const NUMBER_OF_DAYS_TO_SCRAPE = 2;
 
 (async () => {
 
@@ -33,7 +34,7 @@ const NUMBER_OF_DAYS_TO_SCRAPE = 1000;
             let startDate = new Date();
             startDate.setDate(startDate.getDate() - NUMBER_OF_DAYS_TO_SCRAPE);
             startDate = Math.floor(startDate.getTime() / 1000)
-            await page.goto(`https://www.tadpoles.com/remote/v1/events?direction=range&earliest_event_time=${startDate}&latest_event_time=${Math.ceil(Date.now() / 1000)}&num_events=300&client=dashboard&type=Activity`);
+            await page.goto(`${process.env.API_BASE_URL}/events?direction=range&earliest_event_time=${startDate}&latest_event_time=${Math.ceil(Date.now() / 1000)}&num_events=300&client=dashboard&type=Activity`);
             var apiResponse = await page.content();
 
             const innerText = await page.evaluate(() =>  {
@@ -42,7 +43,7 @@ const NUMBER_OF_DAYS_TO_SCRAPE = 1000;
             for (var i = 0; i < innerText.events.length; i++) {
                 const obj = innerText.events[i].key;
                 const key = innerText.events[i].attachments[0];
-                var url = `https://www.tadpoles.com/remote/v1/obj_attachment?obj=${obj}&key=${key};`
+                var url = `${process.env.API_BASE_URL}/obj_attachment?obj=${obj}&key=${key};`
                 try
                 {
                     const response = await page.goto(url, {timeout: 0, waitUntil: 'networkidle0'});
