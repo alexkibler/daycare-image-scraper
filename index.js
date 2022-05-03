@@ -4,7 +4,7 @@ const https = require('https');
 const {utimes} = require('utimes');
 const MINUTE = 60000;
 const HOUR = MINUTE * 60;
-const NUMBER_OF_DAYS_TO_SCRAPE = 1;
+const NUMBER_OF_DAYS_TO_SCRAPE = 1000;
 
 (async () => {
 
@@ -51,7 +51,7 @@ const NUMBER_OF_DAYS_TO_SCRAPE = 1;
                         // TODO: figure out why videos don't work
 
                     } else {
-                        const path = `./images/${innerText.events[i].event_date}/${innerText.events[i].event_time}.png`
+                        const path = `./images/${innerText.events[i].event_date.substr(0,7)}/${innerText.events[i].event_time}.png`
                         if (!fs.existsSync(path)) {
                             console.log('Saving image from ' + innerText.events[i].event_date);
                             await fs.mkdirSync(`./images/${innerText.events[i].event_date}`, { recursive: true});
