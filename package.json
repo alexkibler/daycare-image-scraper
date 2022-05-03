@@ -1,11 +1,11 @@
 {
-  "name": "tadpoles-scraper",
+  "name": "daycare-image-scraper",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
-  "repository": "https://github.com/alexkibler/tadpoles-scraper",
+  "repository": "https://github.com/alexkibler/daycare-image-scraper",
   "author": "Alex Kibler",
   "license": "MIT",
   "dependencies": {
