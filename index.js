@@ -53,10 +53,10 @@ const NUMBER_OF_DAYS_TO_SCRAPE = 2;
                         // TODO: figure out why videos don't work
 
                     } else {
-                        const path = `./images/${innerText.events[i].event_date.substr(0,7)}/${innerText.events[i].event_time}.png`
+                        const path = `${process.env.DOWNLOAD_PATH}/${innerText.events[i].event_date.substr(0,7)}/${innerText.events[i].event_time}.png`
                         if (!fs.existsSync(path)) {
                             console.log('Saving image from ' + innerText.events[i].event_date);
-                            await fs.mkdirSync(`./images/${innerText.events[i].event_date.substr(0,7)}`, { recursive: true});
+                            await fs.mkdirSync(`${process.env.DOWNLOAD_PATH}/${innerText.events[i].event_date.substr(0,7)}`, { recursive: true});
                             const imageBuffer = await response.buffer()
                             await fs.promises.writeFile(path, imageBuffer)
                         } else {
