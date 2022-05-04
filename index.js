@@ -19,10 +19,10 @@ const NUMBER_OF_DAYS_TO_SCRAPE = 2;
             await page.goto(`${process.env.API_BASE_URL}/events?direction=range&earliest_event_time=${startDate}&latest_event_time=${Math.ceil(Date.now() / 1000)}&num_events=300&client=dashboard&type=Activity`);
             var apiResponse = await page.content();
 
-            const innerText = await page.evaluate(() =>  {
+            const apiResponseJson = await page.evaluate(() =>  {
                 return JSON.parse(document.querySelector("body").innerText); 
             }); 
-            await processRecords(innerText, page);
+            await processRecords(apiResponseJson, page);
             console.log('All done!');     
         } else {
             console.log('Login failed');
@@ -86,8 +86,6 @@ const NUMBER_OF_DAYS_TO_SCRAPE = 2;
             await fs.mkdirSync(`${process.env.DOWNLOAD_PATH}/${innerText.events[i].event_date.substr(0, 7)}`, { recursive: true });
             const imageBuffer = await response.buffer();
             await fs.promises.writeFile(path, imageBuffer);
-        } else {
-            console.log('Image already exists: ' + innerText.events[i].event_date);
         }
         await utimes(path, +(innerText.events[i].event_time.toString() + '000'));
     }
