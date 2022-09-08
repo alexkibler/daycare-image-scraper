@@ -62,7 +62,7 @@ const NUMBER_OF_DAYS_TO_SCRAPE = 90;
             catch (error) {
                 console.error(error);
             }
-            await delay(1000);
+            await delay(100);
         }
     }
 
