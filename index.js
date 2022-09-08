@@ -5,14 +5,14 @@ const https = require('https');
 const {utimes} = require('utimes');
 const MINUTE = 60000;
 const HOUR = MINUTE * 60;
-const NUMBER_OF_DAYS_TO_SCRAPE = 2;
+const NUMBER_OF_DAYS_TO_SCRAPE = 90;
 
 (async () => {
 
 
     async function scrape() {
         console.log(`Starting to scrape.  Current time is ${new Date().toISOString()}`)
-        const browser = await puppeteer.launch();
+        const browser = await puppeteer.launch({headless: false});
         const page = await browser.newPage();
         if (await login(page)) {
             let startDate = getStartDate();
@@ -42,10 +42,14 @@ const NUMBER_OF_DAYS_TO_SCRAPE = 2;
     }
 
     async function processRecords(innerText, page) {
+        
+        const delay = (delayInms) => {
+            return new Promise(resolve => setTimeout(resolve, delayInms));
+        }
         for (var i = 0; i < innerText.events.length; i++) {
             const obj = innerText.events[i].key;
             const key = innerText.events[i].attachments[0];
-            var url = `${process.env.API_BASE_URL}/obj_attachment?obj=${obj}&key=${key};`;
+            var url = `${process.env.API_BASE_URL}/obj_attachment?obj=${obj}&key=${key}`;
             try {
                 const response = await page.goto(url, { timeout: 0, waitUntil: 'networkidle0' });
                 if (innerText.events[i].new_attachments[0]?.mime_type == 'video/mp4') {
@@ -58,6 +62,7 @@ const NUMBER_OF_DAYS_TO_SCRAPE = 2;
             catch (error) {
                 console.error(error);
             }
+            await delay(1000);
         }
     }
 
@@ -89,4 +94,5 @@ const NUMBER_OF_DAYS_TO_SCRAPE = 2;
         }
         await utimes(path, +(innerText.events[i].event_time.toString() + '000'));
     }
+
 })();
