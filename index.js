@@ -12,7 +12,7 @@ const NUMBER_OF_DAYS_TO_SCRAPE = 90;
 
     async function scrape() {
         console.log(`Starting to scrape.  Current time is ${new Date().toISOString()}`)
-        const browser = await puppeteer.launch({headless: false});
+        const browser = await puppeteer.launch({headless: true});
         const page = await browser.newPage();
         if (await login(page)) {
             let startDate = getStartDate();
@@ -91,6 +91,9 @@ const NUMBER_OF_DAYS_TO_SCRAPE = 90;
             await fs.mkdirSync(`${process.env.DOWNLOAD_PATH}/${innerText.events[i].event_date.substr(0, 7)}`, { recursive: true });
             const imageBuffer = await response.buffer();
             await fs.promises.writeFile(path, imageBuffer);
+        } else {
+
+            console.log('Image already found: ' + innerText.events[i].event_date);
         }
         await utimes(path, +(innerText.events[i].event_time.toString() + '000'));
     }
