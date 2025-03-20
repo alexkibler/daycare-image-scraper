@@ -7,7 +7,8 @@ const { utimes } = require('utimes');
 const MINUTE = 60000;
 const HOUR = MINUTE * 60;
 const NUMBER_OF_DAYS_TO_SCRAPE = process.env.NUMBER_OF_DAYS_TO_SCRAPE || 90;
-const BATCH_SIZE = 30; // Number of days to process in each batch
+const BATCH_SIZE = 50; // Number of days to process in each batch
+const NUMBER_OF_CONCURRENT_PROCESSES = Number(process.env.NUMBER_OF_CONCURRENT_PROCESSES) || 5;
 
 /* -------------------- Utility Functions -------------------- */
 function delay(ms) {
@@ -46,12 +47,12 @@ async function downloadImage(event, response) {
   const filePath = `${folder}/${event.event_time}.png`;
 
   if (!(await fileExists(filePath))) {
-    console.log('Saving image from ' + event.event_date);
+    // console.log('Saving image from ' + event.event_date);
     await fs.promises.mkdir(folder, { recursive: true });
     const imageBuffer = await response.buffer();
     await fs.promises.writeFile(filePath, imageBuffer);
   } else {
-    console.log('Image already found: ' + event.event_date);
+    // console.log('Image already found: ' + event.event_date);
   }
   // Adjust the file timestamp using utimes
   await utimes(filePath, +(event.event_time.toString() + '000'));
@@ -93,52 +94,67 @@ async function processBatch(page, startDate, endDate) {
   await processRecords(apiResponseJson, page);
 }
 
-/* -------------------- Main Scrape Function -------------------- */
+/* -------------------- Main Scrape Function with Concurrency Limit -------------------- */
 async function scrape() {
-  console.log(`Starting to scrape the past ${NUMBER_OF_DAYS_TO_SCRAPE} days. Current time is ${new Date().toISOString()}`);
+  console.log(`Starting to scrape the past ${NUMBER_OF_DAYS_TO_SCRAPE} days concurrently. Current time is ${new Date().toISOString()}`);
 
   const browser = await puppeteer.launch({ headless: true });
-  const page = await browser.newPage();
-
-  if (await login(page)) {
-    let remainingDays = Number(NUMBER_OF_DAYS_TO_SCRAPE);
-    let batchCount = 0;
-    const now = new Date();
-
-    while (remainingDays > 0) {
-      const currentBatchSize = Math.min(BATCH_SIZE, remainingDays);
-
-      // The batchEnd is set based on how many batches have been processed so far.
-      const batchEnd = new Date(now);
-      batchEnd.setDate(batchEnd.getDate() - batchCount * BATCH_SIZE);
-
-      // The batchStart is calculated as batchEnd minus the current batch size.
-      const batchStart = new Date(batchEnd);
-      batchStart.setDate(batchStart.getDate() - currentBatchSize);
-
-      await processBatch(page, batchStart, batchEnd);
-
-      batchCount++;
-      remainingDays -= currentBatchSize;
-      console.log(`Completed batch ${batchCount}. ${remainingDays} days remaining to scrape.`);
-      await delay(1000); // Pause briefly between batches
-    }
-    console.log('All done!');
-  } else {
+  
+  // Use a temporary page to login and retrieve cookies.
+  const tempPage = await browser.newPage();
+  if (!(await login(tempPage))) {
     console.log('Login failed');
+    await browser.close();
+    return;
   }
+  const cookies = await tempPage.cookies();
+  await tempPage.close();
+
+  const totalDays = Number(NUMBER_OF_DAYS_TO_SCRAPE);
+  const numBatches = Math.ceil(totalDays / BATCH_SIZE);
+  const now = new Date();
+
+  // Start timing the batch processing
+  const startTime = Date.now();
+
+  // Create an array of batch tasks.
+  const batchTasks = [];
+  for (let batchIndex = 0; batchIndex < numBatches; batchIndex++) {
+    const currentBatchSize = Math.min(BATCH_SIZE, totalDays - batchIndex * BATCH_SIZE);
+    
+    const batchEnd = new Date(now);
+    batchEnd.setDate(batchEnd.getDate() - batchIndex * BATCH_SIZE);
+    
+    const batchStart = new Date(batchEnd);
+    batchStart.setDate(batchStart.getDate() - currentBatchSize);
+    
+    // Create a task that opens a new page, sets the cookies, processes the batch, and then closes the page.
+    const task = (async (index, start, end) => {
+      const page = await browser.newPage();
+      await page.setCookie(...cookies);
+      await processBatch(page, start, end);
+      await page.close();
+      console.log(`Completed batch ${index + 1} of ${numBatches}`);
+    })(batchIndex, batchStart, batchEnd);
+    
+    batchTasks.push(task);
+  }
+
+  // Process tasks in chunks to limit concurrency.
+  for (let i = 0; i < batchTasks.length; i += NUMBER_OF_CONCURRENT_PROCESSES) {
+    const tasksChunk = batchTasks.slice(i, i + NUMBER_OF_CONCURRENT_PROCESSES);
+    await Promise.all(tasksChunk);
+  }
+  
+  // Calculate elapsed time
+  const elapsedTime = (Date.now() - startTime) / 1000;
+  console.log(`All batches completed concurrently in ${elapsedTime} seconds!`);
 
   await browser.close();
 }
 
-/* -------------------- Scheduling -------------------- */
-async function scheduleScrape() {
-  await scrape();
-  // Schedule the next scrape run after HOUR milliseconds
-  setTimeout(scheduleScrape, HOUR);
-}
 
 /* -------------------- Main Entry Point -------------------- */
 (async () => {
-  scheduleScrape();
+  await scrape();
 })();
