@@ -5,13 +5,13 @@ const https = require('https');
 const {utimes} = require('utimes');
 const MINUTE = 60000;
 const HOUR = MINUTE * 60;
-const NUMBER_OF_DAYS_TO_SCRAPE = 90;
+const numberOfDaysToScrape = process.env.NUMBER_OF_DAYS_TO_SCRAPE || 90;
 
 (async () => {
 
 
     async function scrape() {
-        console.log(`Starting to scrape.  Current time is ${new Date().toISOString()}`)
+        console.log(`Starting to scrape the past ${numberOfDaysToScrape} days.  Current time is ${new Date().toISOString()}`)
         const browser = await puppeteer.launch({headless: true});
         const page = await browser.newPage();
         if (await login(page)) {
@@ -36,7 +36,7 @@ const NUMBER_OF_DAYS_TO_SCRAPE = 90;
 
     function getStartDate() {
         let startDate = new Date();
-        startDate.setDate(startDate.getDate() - NUMBER_OF_DAYS_TO_SCRAPE);
+        startDate.setDate(startDate.getDate() - numberOfDaysToScrape);
         startDate = Math.floor(startDate.getTime() / 1000);
         return startDate;
     }
