@@ -6,6 +6,7 @@ const {utimes} = require('utimes');
 const MINUTE = 60000;
 const HOUR = MINUTE * 60;
 const numberOfDaysToScrape = process.env.NUMBER_OF_DAYS_TO_SCRAPE || 90;
+const BATCH_SIZE = 60;
 
 (async () => {
 
@@ -15,14 +16,19 @@ const numberOfDaysToScrape = process.env.NUMBER_OF_DAYS_TO_SCRAPE || 90;
         const browser = await puppeteer.launch({headless: true});
         const page = await browser.newPage();
         if (await login(page)) {
-            let startDate = getStartDate();
-            await page.goto(`${process.env.API_BASE_URL}/events?direction=range&earliest_event_time=${startDate}&latest_event_time=${Math.ceil(Date.now() / 1000)}&num_events=300&client=dashboard&type=Activity`);
-            var apiResponse = await page.content();
-
-            const apiResponseJson = await page.evaluate(() =>  {
-                return JSON.parse(document.querySelector("body").innerText); 
-            }); 
-            await processRecords(apiResponseJson, page);
+            let numberOfRemainingDaysToScrape = numberOfDaysToScrape;
+            let count = 0;
+            while (numberOfRemainingDaysToScrape > 0) {
+                const startDate = new Date();
+                startDate.setDate(startDate.getDate() - ((count + 1) * BATCH_SIZE));
+                const endDate = new Date();
+                endDate.setDate(endDate.getDate() - (count * BATCH_SIZE));
+                await processBatch(page, startDate, endDate, processRecords);
+                numberOfRemainingDaysToScrape -= BATCH_SIZE;
+                count++;
+                console.log(`Completed batch ${count}.  ${numberOfRemainingDaysToScrape} days remaining to scrape.`);
+                await delay(1000); // wait for 1 second before next batch
+            }
             console.log('All done!');     
         } else {
             console.log('Login failed');
@@ -33,19 +39,7 @@ const numberOfDaysToScrape = process.env.NUMBER_OF_DAYS_TO_SCRAPE || 90;
 
     setInterval(await scrape, HOUR);
     await scrape();
-
-    function getStartDate() {
-        let startDate = new Date();
-        startDate.setDate(startDate.getDate() - numberOfDaysToScrape);
-        startDate = Math.floor(startDate.getTime() / 1000);
-        return startDate;
-    }
-
     async function processRecords(innerText, page) {
-        
-        const delay = (delayInms) => {
-            return new Promise(resolve => setTimeout(resolve, delayInms));
-        }
         for (var i = 0; i < innerText.events.length; i++) {
             const obj = innerText.events[i].key;
             const key = innerText.events[i].attachments[0];
@@ -64,6 +58,10 @@ const numberOfDaysToScrape = process.env.NUMBER_OF_DAYS_TO_SCRAPE || 90;
             }
             await delay(100);
         }
+    }
+
+    async function delay(delayInms) {
+        return new Promise(resolve => setTimeout(resolve, delayInms));
     }
 
     async function login(page) {
@@ -99,3 +97,14 @@ const numberOfDaysToScrape = process.env.NUMBER_OF_DAYS_TO_SCRAPE || 90;
     }
 
 })();
+
+async function processBatch(page, startDate, endDate, processRecords) {
+    console.log(`Processing batch from ${startDate.toISOString()} to ${endDate.toISOString()}`);
+    await page.goto(`${process.env.API_BASE_URL}/events?direction=range&earliest_event_time=${Math.floor(startDate.getTime() / 1000)}&latest_event_time=${Math.floor(endDate.getTime() / 1000)}&num_events=300&client=dashboard&type=Activity`);
+    var apiResponse = await page.content();
+
+    const apiResponseJson = await page.evaluate(() => {
+        return JSON.parse(document.querySelector("body").innerText);
+    });
+    await processRecords(apiResponseJson, page);
+}
