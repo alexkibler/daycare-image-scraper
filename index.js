@@ -75,7 +75,7 @@ async function processRecords(apiData, page) {
     } catch (error) {
       console.error('Error processing event:', error);
     }
-    await delay(100);
+    await delay(500); // Adding a delay to avoid overwhelming the server
   }
 }
 
