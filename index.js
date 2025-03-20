@@ -7,14 +7,13 @@ const { utimes } = require('utimes');
 const MINUTE = 60000;
 const HOUR = MINUTE * 60;
 const NUMBER_OF_DAYS_TO_SCRAPE = process.env.NUMBER_OF_DAYS_TO_SCRAPE || 90;
-const BATCH_SIZE = 60;
+const BATCH_SIZE = 30; // Number of days to process in each batch
 
 /* -------------------- Utility Functions -------------------- */
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/* Async file existence check */
 async function fileExists(filePath) {
   try {
     await fs.promises.access(filePath, fs.constants.F_OK);
@@ -102,20 +101,25 @@ async function scrape() {
   const page = await browser.newPage();
 
   if (await login(page)) {
-    let remainingDays = NUMBER_OF_DAYS_TO_SCRAPE;
+    let remainingDays = Number(NUMBER_OF_DAYS_TO_SCRAPE);
     let batchCount = 0;
+    const now = new Date();
 
     while (remainingDays > 0) {
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - ((batchCount + 1) * BATCH_SIZE));
+      const currentBatchSize = Math.min(BATCH_SIZE, remainingDays);
 
-      const endDate = new Date();
-      endDate.setDate(endDate.getDate() - (batchCount * BATCH_SIZE) + 1);
+      // The batchEnd is set based on how many batches have been processed so far.
+      const batchEnd = new Date(now);
+      batchEnd.setDate(batchEnd.getDate() - batchCount * BATCH_SIZE);
 
-      await processBatch(page, startDate, endDate);
+      // The batchStart is calculated as batchEnd minus the current batch size.
+      const batchStart = new Date(batchEnd);
+      batchStart.setDate(batchStart.getDate() - currentBatchSize);
 
-      remainingDays -= BATCH_SIZE;
+      await processBatch(page, batchStart, batchEnd);
+
       batchCount++;
+      remainingDays -= currentBatchSize;
       console.log(`Completed batch ${batchCount}. ${remainingDays} days remaining to scrape.`);
       await delay(1000); // Pause briefly between batches
     }
